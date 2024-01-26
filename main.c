@@ -55,6 +55,8 @@
 
 /* USER CODE BEGIN PV */
 
+// ZMIENNE I NIEZBĘDNE PARAMETRY
+
 #define RX_BUFFER_SIZE 10
 struct lcd_disp disp;
 
@@ -94,6 +96,8 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+ // REGULATOR PID, IMPLEMENTACJA
 struct Controller{
 	float Kp;
 	float Ki;
@@ -123,8 +127,6 @@ float calculate_PID(struct Controller *PID, float set_temp, float meas_temp){
 	u_D = (error - PID->prev_error) / PID->Tp;
 
 	PID->prev_error = error;
-
-	// Sum of P, I and D components
 	u = u_P + u_I + u_D;
 
 	return u;
@@ -175,25 +177,22 @@ int main(void)
   MX_NVIC_Init();
 
   /* USER CODE BEGIN 2 */
-//
-
   	  	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   	  	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_1);
   	  	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_2);
   	  	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_3);
   	  	HAL_TIM_PWM_Start(&htim4, TIM_CHANNEL_4);
   	    HAL_TIM_Base_Start_IT(&htim3);
-
   	  	HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_3);
   	    HAL_TIM_OC_Start(&htim1, TIM_CHANNEL_1);
 
  		BMP280_Init(&hi2c4, BMP280_TEMPERATURE_16BIT, BMP280_STANDARD, BMP280_FORCEDMODE);
-//
-// 		htim1.Instance->CNT = 65535 / 2;
-//
+
  		disp.addr = (0x27 << 1);
 	    disp.bl = true;
 	    lcd_init(&disp);
+
+//PARAMETRY ZADANE DLA REGULATORA PID
 
 	    PID1.Kp = 1.2;
 	    PID1.Ki = 0.008;
@@ -211,20 +210,7 @@ int main(void)
 	    while (1)
 	    {
 
-	   // Inicjalizacja wartości początkowej z pomocą przycisku USER i RESET
-//	    	if(HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET)
-//	    	{
-//	    		wartosc_zadana+=0.1f;
-//	    		dtostrf(wartosc_zadana, 3, 1, (char *)msg);
-//	    		sprintf((char *)disp.f_line,"ZADANA:   %s", (char *)msg); //LCD
-//	    		HAL_Delay(50);
-//	    	}
-
-//	    	  HAL_StatusTypeDef status = HAL_UART_Receive(&huart3, key, 1, 1);
-//	    	  if (status == HAL_OK){
-//	    		  wartosc_zadana = atof(key);
-//	    	  }
-
+// KONTROLA, WARUNKI ŚWIECENIA KAŻDEJ DIODY - ZALEŻNE OD PWM
 	    		if(PWM_wyp_u < 16383) {
 	    			__HAL_TIM_SET_COMPARE(&htim4, TIM_CHANNEL_1, 65535);
 	    			HAL_Delay(50);
@@ -266,6 +252,7 @@ int main(void)
 					HAL_Delay(50);
 				}
 
+//KOMUNIKACJA SZEREGOWA(DWUKIERUNKOWA)
 	   	 	  dtostrf(current_temp_f, 3, 1, (char *)msg2);
 
 	   	 	  HAL_UART_Transmit(&huart3, (uint8_t *)zadana, strlen(zadana), 1000);
@@ -280,6 +267,8 @@ int main(void)
 
 			  HAL_UARTEx_ReceiveToIdle_DMA(&huart3, (uint8_t *)key, 10);
 
+//DODAWANIE TEMPERATURY CO 0.1 STOPNIA ZA POMOCĄ PRZYCISKU WBUDOWANEGO W NUCLEO
+
 	  	  	  if(HAL_GPIO_ReadPin(USER_Btn_GPIO_Port, USER_Btn_Pin) == GPIO_PIN_SET)
 	  	  		    	{
 	  	  		    		wartosc_zadana+=0.1f;
@@ -287,21 +276,20 @@ int main(void)
 	  	  		    		sprintf((char *)disp.f_line,"ZADANA:   %s", (char *)msg); //LCD
 	  	  		    		HAL_Delay(50);
 	  	  		    	}
+
 	  	  	  dtostrf(wartosc_zadana, 3, 1, (char *)msg);
+
+//WYŚWIETLANIE ODPOWIEDNIO PARAMETRÓW NA LCD
+
 	  	  	  sprintf((char *)disp.s_line,"AKTUALNA: %s", (char *)msg2); //LCD
 	  	  	  sprintf((char *)disp.f_line,"ZADANA:   %s", (char *)msg); //LCD
 
 	  	  	  lcd_display(&disp);
 	  	  	  HAL_Delay(50);
 
-
-	  	  	  for(int i=0; i>10000; i++)
-	  	  	  {
+	  	  	  for(int i=0; i>10000; i++){
 	  	  		  float NowaAktualna = current_temp_f;
-	  	  		  wartosci[i] = NowaAktualna;
-
-	  	  	  }
-
+	  	  		  wartosci[i] = NowaAktualna;}
 	  	  	  uchyb = wartosc_zadana - current_temp_f;
 
 	  	  	  memset(key, 0, 10);
@@ -378,19 +366,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim->Instance == TIM3){
 
 		BMP280_ReadTemperatureAndPressure(&current_temp_f, &pressure);
-//		sprintf(current_temp_ch_UART, "Current temperature: %.2f \r",  current_temp_f);
-//		HAL_UART_Transmit(&huart3, (uint8_t *)current_temp_ch_UART, sizeof(current_temp_ch_UART)-1, 1000);
-//
-//		sprintf((char*)set_temp_ch_UART, "Set temperature: %.2f", wartosc_zadana);
-//		HAL_UART_Transmit(&huart3, (uint8_t*)set_temp_ch_UART, strlen(set_temp_ch_UART), 1000);
-
 		PWM_wyp_float = (htim1.Init.Period * calculate_PID(&PID1, wartosc_zadana, current_temp_f));
-
-
 		if(PWM_wyp_float < 0.0) PWM_wyp_u = 0;
 		else if(PWM_wyp_float > htim1.Init.Period) PWM_wyp_u = htim1.Init.Period;
 		else PWM_wyp_u = (uint16_t) PWM_wyp_float;
-
 		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, PWM_wyp_u);
 	}
 }
@@ -400,7 +379,6 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size){
 		if(tmp < 20) wartosc_zadana = 23;
 		else if(tmp > 65) wartosc_zadana = 65;
 		else wartosc_zadana = tmp;
-
 		HAL_UARTEx_ReceiveToIdle_DMA(&huart3, (uint8_t *)key, 10);
 
 	}
